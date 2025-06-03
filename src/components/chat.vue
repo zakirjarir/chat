@@ -22,7 +22,7 @@
         </div>
 
         <!-- Chat Body -->
-        <div v-if="user" ref="chatContainer" class="flex-grow-1 p-3 overflow-auto" style="background: #121212;">
+        <div v-if="user" ref="chatContainer" class="flex-grow-1 p-3 overflow-auto" style="height: 88vh" >
           <div v-for="msg in messages" :key="msg.id" :class="msg.sender === user.uid ? 'text-end' : 'text-start'" class="mb-2">
             <span class="p-2 rounded shadow-sm d-inline-block" :class="msg.sender === user.uid ? 'bg-primary text-white' : 'bg-light text-dark'" style="max-width: 70%; word-wrap: break-word;">
               <template v-if="isValidUrl(msg.text)">
@@ -44,7 +44,7 @@
         </div>
       </div>
     </div>
-    <footer class="sticky-bottom border-top shadow-sm">
+    <footer class="sticky-bottom border-top bg-dark">
       <div v-if="user" class="p-3">
         <div class="d-flex align-items-end">
 
@@ -158,21 +158,19 @@ export default {
 .message-input {
   border-radius: 10px;
   padding: 10px 15px;
-  resize: none;
   background-color: #131313;
   font-size: 15px;
   border: 1px solid #ccc;
-  width: 94%;
-  height: 56px;
+  width: 95%;
+  height: 60px;
   transition: all 0.2s ease-in-out;
 }
 
 .message-input:focus {
   outline: none;
-  background-color: #212121;
+  background-color: #131313;
   border-color: #007bff;
   color: #cccccc;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.2);
 }
 
 .send-btn {
@@ -180,7 +178,6 @@ export default {
   height: 48px;
   border-radius: 50%;
   font-size: 18px;
-  transition: background-color 0.3s ease;
 }
 
 
