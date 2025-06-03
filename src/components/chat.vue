@@ -1,12 +1,24 @@
 <template>
-  <div class="container-fluid bg-dark text-white p-0">
+  <div class="container-fluid p-0">
     <div class="row g-0">
       <!-- Chat Area -->
-      <div class="col-12 col-md-9 d-flex flex-column">
+      <div class="col-12 col-md-9 d-flex flex-column" style="height: 90vh;">
         <!-- Header -->
-        <div class="bg-primary text-white py-3 px-4 shadow-sm d-flex sticky-top justify-content-between align-items-center">
-          <h5 class="mb-0 text-center fw-bold flex-grow-1">Z CHAT</h5>
-          <button v-if="user" @click="logout" type="button" class="btn btn-danger btn-sm">Logout</button>
+        <div class="bg-primary py-1 px-2 shadow-sm d-flex sticky-top justify-content-between align-items-center">
+          <h5 class="mb-0 text-white text-center fw-bold flex-grow-1">Z CHAT</h5>
+          <!-- User Dropdown -->
+          <div v-if="user" class="dropdown">
+            <button class="btn btn-primary dropdown-toggle d-flex align-items-center justify-content-center border-0" type="button" id="userMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
+              <i class="bi bi-person-circle fs-4 text-white"></i>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenuButton">
+              <li>
+                <button class="dropdown-item text-danger" @click="logout">
+                  <i class="bi bi-box-arrow-right me-2"></i> Logout
+                </button>
+              </li>
+            </ul>
+          </div>
         </div>
 
         <!-- Chat Body -->
@@ -32,18 +44,21 @@
         </div>
       </div>
     </div>
-    <footer class="sticky-bottom">
-      <!-- Chat Input -->
-      <div v-if="user" class="p-3 border-top d-flex align-items-start bg-dark">
-        <!-- Message Input -->
-        <textarea v-model="newMessage" @keyup.enter.prevent="sendMessage" class="form-control me-2 bg-dark text-white" placeholder="Type a message..." rows="2"></textarea>
+    <footer class="sticky-bottom border-top shadow-sm">
+      <div v-if="user" class="p-3">
+        <div class="d-flex align-items-end">
 
-        <!-- Send Button -->
-        <button class="btn btn-primary py-auto px-auto" @click="sendMessage">
-          <i class="bi bi-send"></i>
-        </button>
+          <!-- Textarea -->
+          <textarea v-model="newMessage" @keyup.enter.prevent="sendMessage" class=" me-2 message-input" placeholder="Type your message..." rows="1"></textarea>
+
+          <!-- Send Button -->
+          <button class="btn btn-primary send-btn d-flex align-items-center justify-content-center" @click="sendMessage" :disabled="!newMessage.trim()">
+            <i class="bi bi-send fs-5"></i>
+          </button>
+        </div>
       </div>
     </footer>
+
   </div>
 </template>
 
@@ -140,4 +155,37 @@ export default {
 </script>
 
 <style scoped>
+.message-input {
+  border-radius: 10px;
+  padding: 10px 15px;
+  resize: none;
+  background-color: #131313;
+  font-size: 15px;
+  border: 1px solid #ccc;
+  width: 94%;
+  height: 56px;
+  transition: all 0.2s ease-in-out;
+}
+
+.message-input:focus {
+  outline: none;
+  background-color: #212121;
+  border-color: #007bff;
+  color: #cccccc;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.2);
+}
+
+.send-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  font-size: 18px;
+  transition: background-color 0.3s ease;
+}
+
+.send-btn:disabled {
+  background-color: #151515;
+  cursor: not-allowed;
+}
+
 </style>
