@@ -2,7 +2,7 @@
   <div class="container-fluid p-0">
     <div class="row g-0">
       <!-- Chat Area -->
-      <div class="col-12 col-md-9 d-flex flex-column" style="height: 90vh;">
+      <div class="col-12 col-md-9 d-flex flex-column">
         <!-- Header -->
         <div class="bg-primary py-1 px-2 shadow-sm d-flex sticky-top justify-content-between align-items-center">
           <h5 class="mb-0 text-white text-center fw-bold flex-grow-1">Z CHAT</h5>
@@ -52,7 +52,7 @@
           <textarea v-model="newMessage" @keyup.enter.prevent="sendMessage" class=" me-2 message-input" placeholder="Type your message..." rows="1"></textarea>
 
           <!-- Send Button -->
-          <button class="btn btn-primary send-btn d-flex align-items-center justify-content-center" @click="sendMessage" :disabled="!newMessage.trim()">
+          <button class="btn btn-primary send-btn d-flex align-items-center justify-content-center" @click="sendMessage">
             <i class="bi bi-send fs-5"></i>
           </button>
         </div>
@@ -183,9 +183,5 @@ export default {
   transition: background-color 0.3s ease;
 }
 
-.send-btn:disabled {
-  background-color: #151515;
-  cursor: not-allowed;
-}
 
 </style>
