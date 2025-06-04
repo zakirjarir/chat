@@ -40,12 +40,6 @@ export default {
             this.email,
             this.password
         );
-        // const user = userCredential.user;
-        // console.log("Login successful:", user);
-        // console.log("User ID (UID):", user.uid);
-        // console.log("Email:", user.email);
-        // console.log("Access Token:", await user.getIdToken());
-
         // ✅ Redirect or save to store
         this.$router.push("/chat");
       } catch (error) {

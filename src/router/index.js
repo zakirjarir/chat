@@ -1,6 +1,7 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import chat from "@/components/chat.vue";
 import login from "@/components/login.vue";
+import VdioCall from "@/components/vdioCall.vue";
 
 const routes = [
     {
@@ -12,6 +13,11 @@ const routes = [
         path:'/',
         name: 'login',
         component: login
+    },
+    {
+        path:'/vdiocall',
+        name: 'vdiocall',
+        component: VdioCall
     }
 ]
 

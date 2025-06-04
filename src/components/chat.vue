@@ -6,6 +6,9 @@
         <!-- Header -->
         <div class="bg-primary py-1 px-2 shadow-sm d-flex sticky-top justify-content-between align-items-center">
           <h5 class="mb-0 text-white text-center fw-bold flex-grow-1">Z CHAT</h5>
+          <router-link to="/vdiocall" class="btn btn-success  btn-sm " @click="startCall">
+            <i class="bi bi-telephone"></i>
+          </router-link>
           <!-- User Dropdown -->
           <div v-if="user" class="dropdown">
             <button class="btn btn-primary dropdown-toggle d-flex align-items-center justify-content-center border-0" type="button" id="userMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
