@@ -5,24 +5,27 @@
       <div class="col-12 col-md-9 d-flex flex-column">
         <!-- Header -->
         <div class="bg-primary py-1 px-2 shadow-sm d-flex sticky-top justify-content-between align-items-center">
-          <h5 class="mb-0 text-white text-center fw-bold flex-grow-1">Z CHAT</h5>
-          <router-link to="/vdiocall" class="btn btn-success  btn-sm " @click="startCall">
-            <i class="bi bi-telephone"></i>
-          </router-link>
-          <!-- User Dropdown -->
-          <div v-if="user" class="dropdown">
-            <button class="btn btn-primary dropdown-toggle d-flex align-items-center justify-content-center border-0" type="button" id="userMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
-              <i class="bi bi-person-circle fs-4 text-white"></i>
-            </button>
-            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenuButton">
-              <li>
-                <button class="dropdown-item text-danger" @click="logout">
-                  <i class="bi bi-box-arrow-right me-2"></i> Logout
-                </button>
-              </li>
-            </ul>
+          <!-- Back Button -->
+          <div class="me-2" @click="$router.back()" title="Back">
+            <i class="bi bi-arrow-left fs-3"></i>
+          </div>
+
+          <!-- User Name -->
+          <h5 class="mb-0 text-white text-center fw-bold flex-grow-1">{{ this.toUser }}</h5>
+
+          <!-- Call Buttons -->
+          <div class="d-flex gap-4 me-3">
+            <!-- Video Call -->
+            <router-link to="/vdiocall" class="" @click="startVideoCall" title="Video Call">
+              <i class="bi bi-camera-video-fill text-dark fs-5 "></i>
+            </router-link>
+            <!-- Audio Call -->
+            <router-link to="/audiocall" class="" @click="startAudioCall" title="Audio Call">
+              <i class="bi bi-telephone-fill text-white fs-5"></i>
+            </router-link>
           </div>
         </div>
+
 
         <!-- Chat Body -->
         <div v-if="user" ref="chatContainer" class="flex-grow-1 p-3 overflow-auto" style="height: 88vh" >
@@ -67,40 +70,62 @@
 
 <script>
 import { db, auth } from "../firebass/configration";
-import {collection, addDoc, query, orderBy, onSnapshot, serverTimestamp,} from "firebase/firestore";
-import {onAuthStateChanged, signOut, signInAnonymously as firebaseSignInAnonymously,} from "firebase/auth";
+import {
+  collection,
+  addDoc,
+  query,
+  orderBy,
+  where,
+  onSnapshot,
+  serverTimestamp,
+  getDoc,
+  doc,
+    or,
+    and
+} from "firebase/firestore";
+import {
+  onAuthStateChanged,
+  signInAnonymously as firebaseSignInAnonymously,
+} from "firebase/auth";
 import { nextTick } from "vue";
 
 export default {
   name: "ChatApp",
   data() {
     return {
-      user: null,
+      user: {},
+      uid: null,
       newMessage: "",
       messages: [],
+      toUid: this.$route.params.id || null,
+      toUser: null,
     };
   },
   methods: {
     async signInAnonymously() {
       try {
-        this.$router.push('/')
         const userCredential = await firebaseSignInAnonymously(auth);
         this.user = userCredential.user;
+        this.uid = this.user.uid;
       } catch (error) {
         console.error("Anonymous login error:", error);
+        this.$router.push("/");
       }
     },
+
     async sendMessage() {
       if (this.newMessage.trim() === "") return;
       if (!this.user || !this.user.uid) {
         alert("User not authenticated!");
         return;
       }
+
       try {
         await addDoc(collection(db, "messages"), {
           text: this.newMessage,
           sender: this.user.uid,
           uid: this.user.uid,
+          reciever: this.toUid,
           createdAt: serverTimestamp(),
         });
         this.newMessage = "";
@@ -109,17 +134,17 @@ export default {
       }
     },
 
-    logout() {
-      const confirmLogout = confirm("Are you sure you want to logout?");
-      if (!confirmLogout) return;
-      signOut(auth)
-          .then(() => {
-            this.user = null;
-            this.$router.push("/");
-          })
-          .catch((error) => {
-            alert("Logout failed: " + error.message);
-          });
+    async getUserData(uid) {
+      try {
+        const userDoc = await getDoc(doc(db, "users", uid));
+        if (userDoc.exists()) {
+          this.toUser = userDoc.data().name || "Anonymous";
+        } else {
+          console.error("No such user!");
+        }
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+      }
     },
 
     scrollToBottom() {
@@ -137,25 +162,59 @@ export default {
         return false;
       }
     },
+
+    loginStatus() {
+      return new Promise((resolve, reject) => {
+        onAuthStateChanged(auth, (user) => {
+          if (user) {
+            this.user = user;
+            this.uid = user.uid;
+            resolve(user);
+          } else {
+            this.$router.push("/");
+            reject("No user");
+          }
+        });
+      });
+    },
+
   },
 
-  mounted() {
-    onAuthStateChanged(auth, (user) => {
-      this.user = user;
-    });
+  async mounted() {
+    try {
+      const user = await this.loginStatus();
+      await this.getUserData(this.toUid);
 
-    const q = query(collection(db, "messages"), orderBy("createdAt"));
-    onSnapshot(q, async (snapshot) => {
-      this.messages = snapshot.docs.map((doc) => ({
-        ...doc.data(),
-        id: doc.id,
-      }));
-      await nextTick();
-      this.scrollToBottom();
-    });
+      const q = query(
+          collection(db, "messages"),
+          or(
+              and(
+                  where("sender", "==", user.uid),
+                  where("reciever", "==", this.toUid)
+              ),
+              and(
+                  where("sender", "==", this.toUid),
+                  where("reciever", "==", user.uid)
+              )
+          ),
+          orderBy("createdAt")
+      );
+
+      onSnapshot(q, async (snapshot) => {
+        this.messages = snapshot.docs.map((doc) => ({
+          ...doc.data(),
+          id: doc.id,
+        }));
+        await nextTick();
+        this.scrollToBottom();
+      });
+    } catch (err) {
+      console.error("Error during mount:", err);
+    }
   },
 };
 </script>
+
 
 <style scoped>
 .message-input {
@@ -182,6 +241,10 @@ export default {
   border-radius: 50%;
   font-size: 18px;
 }
-
+.bi-arrow-left{
+  cursor: pointer;
+  color: white;
+  font-weight: bolder;
+}
 
 </style>
