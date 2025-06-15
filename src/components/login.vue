@@ -14,17 +14,25 @@
             <span class="input-group-text bg-secondary text-white">
               <i class="bi bi-envelope-fill"></i>
             </span>
-            <input type="email" class="form-control bg-dark text-white  shadow-sm" v-model="email" required />
+            <input type="email" class="form-control bg-dark text-white shadow-sm" v-model="email" required />
           </div>
         </div>
 
         <div class="mb-3">
           <label>Password</label>
           <div class="input-group">
-            <span class="input-group-text bg-secondary  text-white">
+            <span class="input-group-text bg-secondary text-white">
               <i class="bi bi-lock-fill"></i>
             </span>
-            <input type="password" class="form-control bg-dark text-white  shadow-sm" v-model="password" required />
+            <input
+                :type="showPassword ? 'text' : 'password'"
+                class="form-control bg-dark text-white shadow-sm"
+                v-model="password"
+                required
+            />
+            <span class="input-group-text bg-secondary text-white" @click="togglePasswordVisibility" style="cursor: pointer;">
+              <i :class="showPassword ? 'bi bi-eye-slash-fill' : 'bi bi-eye-fill'"></i>
+            </span>
           </div>
         </div>
 
@@ -40,30 +48,38 @@
         <div class="mb-3">
           <label>Full Name</label>
           <div class="input-group">
-            <span class="input-group-text bg-secondary  text-white">
+            <span class="input-group-text bg-secondary text-white">
               <i class="bi bi-person-fill"></i>
             </span>
-            <input type="text" class="form-control bg-dark text-white  shadow-sm" v-model="name" required />
+            <input type="text" class="form-control bg-dark text-white shadow-sm" v-model="name" required />
           </div>
         </div>
 
         <div class="mb-3">
           <label>Email</label>
           <div class="input-group">
-            <span class="input-group-text bg-secondary  text-white">
+            <span class="input-group-text bg-secondary text-white">
               <i class="bi bi-envelope-fill"></i>
             </span>
-            <input type="email" class="form-control bg-dark text-white  shadow-sm" v-model="email" required />
+            <input type="email" class="form-control bg-dark text-white shadow-sm" v-model="email" required />
           </div>
         </div>
 
         <div class="mb-3">
           <label>Password</label>
           <div class="input-group">
-            <span class="input-group-text bg-secondary  text-white">
+            <span class="input-group-text bg-secondary text-white">
               <i class="bi bi-lock-fill"></i>
             </span>
-            <input type="password" class="form-control bg-dark text-white  shadow-sm" v-model="password" required />
+            <input
+                :type="showPassword ? 'text' : 'password'"
+                class="form-control bg-dark text-white shadow-sm"
+                v-model="password"
+                required
+            />
+            <span class="input-group-text bg-secondary text-white" @click="togglePasswordVisibility" style="cursor: pointer;">
+              <i :class="showPassword ? 'bi bi-eye-slash-fill' : 'bi bi-eye-fill'"></i>
+            </span>
           </div>
         </div>
 
@@ -73,6 +89,7 @@
           <a href="#" @click.prevent="isLogin = true" class="text-info">Login here</a>
         </p>
       </form>
+
     </div>
   </div>
 </template>
@@ -94,9 +111,13 @@ export default {
       email: "",
       password: "",
       name: "",
+      showPassword: false,
     };
   },
   methods: {
+    togglePasswordVisibility() {
+      this.showPassword = !this.showPassword;
+    },
     async loginUser() {
       try {
         await signInWithEmailAndPassword(auth, this.email, this.password);
@@ -123,7 +144,6 @@ export default {
         this.isLogin = true;
         alert("Registration successful! Please login.");
         this.name = this.email = this.password = "";
-
       } catch (error) {
         alert("Registration failed: " + error.message);
       }

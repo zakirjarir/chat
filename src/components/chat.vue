@@ -25,20 +25,26 @@
       <!-- Chat Area -->
       <div class="col-12 col-md-9 d-flex flex-column">
         <!-- Chat Body -->
-        <div v-if="user" ref="chatContainer" class="flex-grow-1 p-3 overflow-auto" style="height: 88vh" >
+        <div v-if="user" ref="chatContainer" class="flex-grow-1 p-3 overflow-auto" style="height: 88vh">
           <div v-for="msg in messages" :key="msg.id" :class="msg.sender === user.uid ? 'text-end' : 'text-start'" class="mb-2">
-            <span class="p-2 rounded shadow-sm d-inline-block" :class="msg.sender === user.uid ? 'bg-primary text-white' : 'bg-light text-dark'" style="max-width: 70%; word-wrap: break-word;">
-              <template v-if="isValidUrl(msg.text)">
-                <a :href="msg.text" target="_blank" class="text-decoration-underline">
+            <div class="d-inline-block text-start" style="max-width: 70%">
+              <span class="p-2 rounded shadow-sm d-inline-block" :class="msg.sender === user.uid ? 'bg-primary text-white' : 'bg-light text-dark'" style="word-wrap: break-word;">
+                <template v-if="isValidUrl(msg.text)">
+                  <a :href="msg.text" target="_blank" class="text-decoration-underline text-dark">
+                    {{ msg.text }}
+                  </a>
+                </template>
+                <template v-else>
                   {{ msg.text }}
-                </a>
-              </template>
-              <template v-else>
-                {{ msg.text }}
-              </template>
-            </span>
+                </template>
+              </span>
+            </div>
+            <div class="small text-white mt-1" style="font-size: 0.75rem;">
+              {{ formatTime(msg.createdAt) }}
+            </div>
           </div>
         </div>
+
         <!-- Anonymous Login -->
         <div v-else class="text-center my-auto">
           <button @click="signInAnonymously" class="btn btn-outline-light">
@@ -151,13 +157,20 @@ export default {
       }
     },
 
-    isValidUrl(str) {
+    isValidUrl(text) {
       try {
-        new URL(str);
+        new URL(text);
         return true;
       } catch (_) {
         return false;
       }
+    },
+    formatTime(timestamp) {
+      if (!timestamp) return '';
+      const date = timestamp instanceof Date ? timestamp : timestamp.toDate?.() || new Date(timestamp);
+      const hours = date.getHours().toString().padStart(2, '0');
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      return `${hours}:${minutes}`;
     },
 
     loginStatus() {
