@@ -1,32 +1,29 @@
 <template>
   <div class="container-fluid p-0">
+    <div class="bg-primary py-1 px-2 shadow-sm d-flex sticky-top justify-content-between align-items-center">
+      <!-- Back Button -->
+      <div class="me-2" @click="$router.back()" title="Back">
+        <i class="bi bi-arrow-left fs-3"></i>
+      </div>
+
+      <!-- User Name -->
+      <h5 class="mb-0 text-white text-center fw-bold flex-grow-1">{{ this.toUser }}</h5>
+
+      <!-- Call Buttons -->
+      <div class="d-flex gap-4 me-3">
+        <!-- Video Call -->
+        <router-link to="/vdiocall" class="" @click="startVideoCall" title="Video Call">
+          <i class="bi bi-camera-video-fill text-dark fs-5 "></i>
+        </router-link>
+        <!-- Audio Call -->
+        <router-link to="/audiocall" class="" @click="startAudioCall" title="Audio Call">
+          <i class="bi bi-telephone-fill text-white fs-5"></i>
+        </router-link>
+      </div>
+    </div>
     <div class="row g-0">
       <!-- Chat Area -->
       <div class="col-12 col-md-9 d-flex flex-column">
-        <!-- Header -->
-        <div class="bg-primary py-1 px-2 shadow-sm d-flex sticky-top justify-content-between align-items-center">
-          <!-- Back Button -->
-          <div class="me-2" @click="$router.back()" title="Back">
-            <i class="bi bi-arrow-left fs-3"></i>
-          </div>
-
-          <!-- User Name -->
-          <h5 class="mb-0 text-white text-center fw-bold flex-grow-1">{{ this.toUser }}</h5>
-
-          <!-- Call Buttons -->
-          <div class="d-flex gap-4 me-3">
-            <!-- Video Call -->
-            <router-link to="/vdiocall" class="" @click="startVideoCall" title="Video Call">
-              <i class="bi bi-camera-video-fill text-dark fs-5 "></i>
-            </router-link>
-            <!-- Audio Call -->
-            <router-link to="/audiocall" class="" @click="startAudioCall" title="Audio Call">
-              <i class="bi bi-telephone-fill text-white fs-5"></i>
-            </router-link>
-          </div>
-        </div>
-
-
         <!-- Chat Body -->
         <div v-if="user" ref="chatContainer" class="flex-grow-1 p-3 overflow-auto" style="height: 88vh" >
           <div v-for="msg in messages" :key="msg.id" :class="msg.sender === user.uid ? 'text-end' : 'text-start'" class="mb-2">
@@ -201,17 +198,33 @@ export default {
       );
 
       onSnapshot(q, async (snapshot) => {
-        this.messages = snapshot.docs.map((doc) => ({
+        this.messages = snapshot.docs.map(doc => ({
           ...doc.data(),
           id: doc.id,
         }));
         await nextTick();
         this.scrollToBottom();
+
+        if (this.messages.length > 0) {
+           this.lastMessage = this.messages[this.messages.length - 1];
+          if( this.lastMessage.sender !== user.uid) {
+            this.showNotification("🔔 New Message", {
+              body: `New message: ${this.lastMessage.text}`,
+              icon: "https://cdn-icons-png.flaticon.com/512/190/190411.png",
+              badge: "https://cdn-icons-png.flaticon.com/512/190/190411.png",
+              data: {
+                url: "http://localhost:8080/zchat/#/chat/" + this.toUid,
+              }
+            });
+          }
+        }
       });
+
     } catch (err) {
       console.error("Error during mount:", err);
     }
-  },
+  }
+
 };
 </script>
 

@@ -28,7 +28,6 @@
           </div>
         </div>
       </div>
-
     </div>
     <div class="container py-4">
       <div v-if="user" class="overflow-hidden bg-dark">
@@ -133,6 +132,7 @@ export default {
     // },
   },
   mounted() {
+
     onAuthStateChanged(auth, (user) => {
       this.user = user;
       if (user) {
@@ -141,6 +141,8 @@ export default {
         this.signInAnonymously();
       }
     });
+
+
   },
 };
 </script>

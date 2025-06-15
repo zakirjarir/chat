@@ -268,7 +268,7 @@ export default {
   mounted() {
     const auth = getAuth();
     this.user = auth.currentUser;
-
+    this.startCall()
     if (!this.user) {
       this.signInAnonymously();
     }
@@ -279,10 +279,8 @@ export default {
     onSnapshot(callDocRef, (docSnapshot) => {
       if (docSnapshot.exists()) {
         const data = docSnapshot.data();
-
-        // ✅ যখন remote ইউজার offer পাঠায় (call দেয়)
         if (data.offer && !this.remoteDescriptionSet) {
-          alert("📞 Incoming call..."); // এখানে তোকে UI show করতে হবে
+          alert("📞 Incoming call...");
           console.log("Incoming call detected:", data.offer);
 
           // Optional: Incoming call sound play করতে পারিস এখানে
