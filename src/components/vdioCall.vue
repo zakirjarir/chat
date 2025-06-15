@@ -75,9 +75,9 @@ export default {
 
         // Delete Firestore call document
         const callDocRef = doc(db, "calls", this.callDocId); // this.callDocId = "video-call-room"
-        await deleteDoc(callDocRef); // ডকুমেন্ট পুরোপুরি মুছে ফেলবে
+        await deleteDoc(callDocRef);
 
-        this.$router.push("/chat");
+        this.$router.go(-1);
         console.log("Call ended and document deleted.");
       } catch (error) {
         console.error("Error ending call:", error);
@@ -274,35 +274,9 @@ export default {
     onAuthStateChanged(auth, async (user) => {
       if (user) {
         this.user = user;
-        const currentUid = user.uid;
 
         // Start call only after user is ready
         this.startCall();
-
-        const callDocRef = doc(db, "calls", this.callDocId);
-
-        // 👂 Listen to changes in the call document
-        onSnapshot(callDocRef, (docSnapshot) => {
-          if (docSnapshot.exists()) {
-            const data = docSnapshot.data();
-
-            // 🛑 Check if it's an offer for current user
-            if (data.offer && !this.remoteDescriptionSet && data.offer.receiver === currentUid) {
-              // ✅ Show browser notification (assuming Notification permission granted)
-              this.showNotification('📞 Incoming call from ' + data.offer.sender,
-                  {
-                    body: "Do you want to answer the call?",
-                    icon: "https://cdn-icons-png.flaticon.com/512/5978/5978995.png", // optional
-                  }
-              );
-
-              // ✅ Also show confirmation dialog
-              if (confirm("📞 Incoming call...\nDo you want to receive?")) {
-                this.answerCall(); // 🟢 Answer the call
-              }
-            }
-          }
-        });
 
 
       } else {
