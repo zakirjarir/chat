@@ -12,13 +12,13 @@
       <!-- Call Buttons -->
       <div class="d-flex gap-4 me-3">
         <!-- Video Call -->
-        <router-link to="/vdiocall" class="" @click="startVideoCall" title="Video Call">
+        <div class="" @click="startVideoCall()">
           <i class="bi bi-camera-video-fill text-dark fs-5 "></i>
-        </router-link>
+        </div>
         <!-- Audio Call -->
-        <router-link to="/audiocall" class="" @click="startAudioCall" title="Audio Call">
+        <div class="" @click="startAudioCall" title="Audio Call">
           <i class="bi bi-telephone-fill text-white fs-5"></i>
-        </router-link>
+        </div>
       </div>
     </div>
     <div class="row g-0">
@@ -174,12 +174,18 @@ export default {
         });
       });
     },
+    startVideoCall() {
+      this.$router.push({ name: "vdiocall", params: { id: this.toUid } });
+    },
 
   },
+
 
   async mounted() {
     try {
       const user = await this.loginStatus();
+      this.currentUid = user.uid; // ✅ save current user ID
+
       await this.getUserData(this.toUid);
 
       const q = query(
@@ -206,8 +212,8 @@ export default {
         this.scrollToBottom();
 
         if (this.messages.length > 0) {
-           this.lastMessage = this.messages[this.messages.length - 1];
-          if( this.lastMessage.sender !== user.uid) {
+          this.lastMessage = this.messages[this.messages.length - 1];
+          if (this.lastMessage.sender !== user.uid) {
             this.showNotification("🔔 New Message", {
               body: `New message: ${this.lastMessage.text}`,
               icon: "https://cdn-icons-png.flaticon.com/512/190/190411.png",
@@ -220,10 +226,33 @@ export default {
         }
       });
 
+      // ✅ Call Document Ref এখন ইউজার আইডি পাওয়ার পরে
+      const callDocId = "video-call-room"; // অথবা dynamic করে this.callDocId
+      const callDocRef = doc(db, "calls", callDocId);
+
+      // ✅ Incoming call listener
+      onSnapshot(callDocRef, (docSnapshot) => {
+        if (docSnapshot.exists()) {
+          const data = docSnapshot.data();
+
+          if (data.offer && !this.remoteDescriptionSet && data.offer.receiver === this.currentUid) {
+            this.showNotification('📞 Incoming call from ' + data.offer.sender, {
+              body: "Do you want to answer the call?",
+              icon: "https://cdn-icons-png.flaticon.com/512/5978/5978995.png",
+            });
+
+            if (confirm("📞 Incoming call...\nDo you want to receive?")) {
+              this.answerCall(); // 🟢 Answer the call
+            }
+          }
+        }
+      });
+
     } catch (err) {
       console.error("Error during mount:", err);
     }
   }
+
 
 };
 </script>

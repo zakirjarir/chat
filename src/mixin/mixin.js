@@ -10,9 +10,9 @@ export default {
                 console.warn("❌ This browser does not support notifications.");
                 return;
             }
-            if (!document.hidden) {
-                return;
-            }
+            // if (!document.hidden) {
+            //     return;
+            // }
 
             const permission = await Notification.requestPermission();
 
@@ -29,5 +29,5 @@ export default {
                 console.warn("Notification permission not granted!");
             }
         }
-    }
+    },
 };

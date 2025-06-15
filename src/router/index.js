@@ -21,7 +21,7 @@ const routes = [
         component: login
     },
     {
-        path:'/vdiocall',
+        path:'/vdiocall/:id',
         name: 'vdiocall',
         component: VdioCall
     },

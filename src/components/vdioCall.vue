@@ -6,12 +6,6 @@
       <video ref="localVideo" autoplay playsinline muted class="local-video"></video>
 
       <div class="controls d-flex justify-content-center gap-3 mt-3">
-        <button class="btn btn-outline-info d-flex align-items-center btn-sm gap-2" @click="startCall">
-          <i class="bi bi-telephone"></i> Call
-        </button>
-        <button class="btn btn-success d-flex align-items-center btn-sm gap-2" @click="answerCall">
-          <i class="bi bi-check-circle"></i> Recive
-        </button>
         <button class="btn btn-danger d-flex align-items-center btn-sm gap-2" @click="endCall">
           <i class="bi bi-telephone"></i> End
         </button>
@@ -30,10 +24,11 @@ import {
   getDoc,
   collection,
   addDoc,
-  onSnapshot
+  onSnapshot,
+  deleteDoc
 } from "firebase/firestore";
 import { db} from "@/firebass/configration";
-import {getAuth} from "firebase/auth";
+import {getAuth, onAuthStateChanged ,signInAnonymously} from "firebase/auth";
 
 
 export default {
@@ -79,19 +74,26 @@ export default {
         }
 
         // Delete Firestore call document
-        const callDocRef = doc(db, "calls", this.callDocId);
-        await setDoc(callDocRef, {}); // অথবা deleteDoc(callDocRef) যদি ফায়ারস্টোর থেকে পুরো ডাটা মুছতে চাও
+        const callDocRef = doc(db, "calls", this.callDocId); // this.callDocId = "video-call-room"
+        await deleteDoc(callDocRef); // ডকুমেন্ট পুরোপুরি মুছে ফেলবে
 
         this.$router.push("/chat");
-        console.log("Call ended.");
+        console.log("Call ended and document deleted.");
       } catch (error) {
         console.error("Error ending call:", error);
       }
     },
     async startCall() {
+      // Sender (Caller) UID
+      const senderUid = this.user.uid;
+      const receiverUid = this.$route.params.id;
+
+      // 🔑 Unique call doc ID
+      this.callDocId = [senderUid, receiverUid].sort().join("_");
+
       this.pc = new RTCPeerConnection();
 
-      // Local Stream with error handling
+      // Local Stream
       try {
         this.localStream = await navigator.mediaDevices.getUserMedia({
           video: true,
@@ -107,40 +109,43 @@ export default {
       this.remoteStream = new MediaStream();
       this.$refs.remoteVideo.srcObject = this.remoteStream;
 
-      // Add local tracks to peer connection
+      // Local Tracks
       this.localStream.getTracks().forEach((track) => {
         this.pc.addTrack(track, this.localStream);
       });
 
-      // When remote track arrives, add to remoteStream
+      // Remote Tracks
       this.pc.ontrack = (event) => {
         event.streams[0].getTracks().forEach((track) => {
           this.remoteStream.addTrack(track);
         });
       };
 
-      // Firestore refs
+      // Firestore references
       const callDocRef = doc(db, "calls", this.callDocId);
       const offerCandidatesRef = collection(callDocRef, "offerCandidates");
       const answerCandidatesRef = collection(callDocRef, "answerCandidates");
 
-      // ICE candidate - send to offerCandidates collection
+      // Send ICE candidates
       this.pc.onicecandidate = async (event) => {
         if (event.candidate) {
           await addDoc(offerCandidatesRef, event.candidate.toJSON());
         }
       };
 
-      // Create offer
+      // Create and send offer
       const offerDescription = await this.pc.createOffer();
       await this.pc.setLocalDescription(offerDescription);
 
       const offer = {
         type: offerDescription.type,
         sdp: offerDescription.sdp,
+        sender: senderUid,
+        receiver: receiverUid,
+        timestamp: Date.now(),
       };
 
-      await setDoc(callDocRef, { offer });
+      await setDoc(callDocRef, {offer});
 
       // Listen for answer
       onSnapshot(callDocRef, (snapshot) => {
@@ -151,7 +156,7 @@ export default {
         }
       });
 
-      // Listen for answer ICE candidates
+      // Listen for ICE candidates from answer side
       onSnapshot(answerCandidatesRef, (snapshot) => {
         snapshot.docChanges().forEach(async (change) => {
           if (change.type === "added") {
@@ -162,7 +167,6 @@ export default {
             ) {
               await this.pc.addIceCandidate(candidate);
             } else {
-              // অপেক্ষা করো যতক্ষণ remoteDescription সেট হয়
               const interval = setInterval(async () => {
                 if (
                     this.pc.remoteDescription &&
@@ -181,7 +185,7 @@ export default {
     async answerCall() {
       this.pc = new RTCPeerConnection();
 
-      // Local Stream with error handling
+      // Step 1: Get local media (camera + mic)
       try {
         this.localStream = await navigator.mediaDevices.getUserMedia({
           video: true,
@@ -194,34 +198,35 @@ export default {
         return;
       }
 
+      // Step 2: Create empty remote stream and attach to video element
       this.remoteStream = new MediaStream();
       this.$refs.remoteVideo.srcObject = this.remoteStream;
 
-      // Add local tracks to peer connection
+      // Step 3: Add local tracks to peer connection
       this.localStream.getTracks().forEach((track) => {
         this.pc.addTrack(track, this.localStream);
       });
 
-      // When remote track arrives, add to remoteStream
+      // Step 4: Receive remote track
       this.pc.ontrack = (event) => {
         event.streams[0].getTracks().forEach((track) => {
           this.remoteStream.addTrack(track);
         });
       };
 
-      // Firestore refs
+      // Step 5: Firestore references
       const callDocRef = doc(db, "calls", this.callDocId);
       const offerCandidatesRef = collection(callDocRef, "offerCandidates");
       const answerCandidatesRef = collection(callDocRef, "answerCandidates");
 
-      // ICE candidate - answerer sends to answerCandidates collection
+      // Step 6: Send ICE candidates to answerCandidates
       this.pc.onicecandidate = async (event) => {
         if (event.candidate) {
           await addDoc(answerCandidatesRef, event.candidate.toJSON());
         }
       };
 
-      // Get call data (offer)
+      // Step 7: Load offer and set remote description
       const callDoc = await getDoc(callDocRef);
       if (!callDoc.exists()) {
         alert("Call not found!");
@@ -232,7 +237,7 @@ export default {
       await this.pc.setRemoteDescription(new RTCSessionDescription(offerDescription));
       this.remoteDescriptionSet = true;
 
-      // Create answer
+      // Step 8: Create and set answer
       const answerDescription = await this.pc.createAnswer();
       await this.pc.setLocalDescription(answerDescription);
 
@@ -241,16 +246,13 @@ export default {
         sdp: answerDescription.sdp,
       };
 
-      // Update call doc with answer
-      await setDoc(callDocRef, { answer }, { merge: true });
+      // Step 9: Send answer to Firestore
+      await setDoc(callDocRef, {answer}, {merge: true});
 
-      // Add any ICE candidates that arrived before remoteDescription was set
-      for (const candidate of this.pendingCandidates) {
-        await this.pc.addIceCandidate(candidate);
-      }
-      this.pendingCandidates = [];
+      // Step 10: Buffer any candidates if needed
+      if (!this.pendingCandidates) this.pendingCandidates = [];
 
-      // Listen for offer ICE candidates from caller
+      // Step 11: Listen for offer ICE candidates
       onSnapshot(offerCandidatesRef, (snapshot) => {
         snapshot.docChanges().forEach(async (change) => {
           if (change.type === "added") {
@@ -267,30 +269,54 @@ export default {
   },
   mounted() {
     const auth = getAuth();
-    this.user = auth.currentUser;
-    this.startCall()
-    if (!this.user) {
-      this.signInAnonymously();
-    }
 
-    const callDocRef = doc(db, "calls", this.callDocId); // callDocId = "video-call-room"
+    // 🔐 Wait until user is fully ready (async)
+    onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        this.user = user;
+        const currentUid = user.uid;
 
-    // Listen to changes
-    onSnapshot(callDocRef, (docSnapshot) => {
-      if (docSnapshot.exists()) {
-        const data = docSnapshot.data();
-        if (data.offer && !this.remoteDescriptionSet) {
-          alert("📞 Incoming call...");
-          console.log("Incoming call detected:", data.offer);
+        // Start call only after user is ready
+        this.startCall();
 
-          // Optional: Incoming call sound play করতে পারিস এখানে
-          // const ring = new Audio('/ringtone.mp3');
-          // ring.play();
+        const callDocRef = doc(db, "calls", this.callDocId);
+
+        // 👂 Listen to changes in the call document
+        onSnapshot(callDocRef, (docSnapshot) => {
+          if (docSnapshot.exists()) {
+            const data = docSnapshot.data();
+
+            // 🛑 Check if it's an offer for current user
+            if (data.offer && !this.remoteDescriptionSet && data.offer.receiver === currentUid) {
+              // ✅ Show browser notification (assuming Notification permission granted)
+              this.showNotification('📞 Incoming call from ' + data.offer.sender,
+                  {
+                    body: "Do you want to answer the call?",
+                    icon: "https://cdn-icons-png.flaticon.com/512/5978/5978995.png", // optional
+                  }
+              );
+
+              // ✅ Also show confirmation dialog
+              if (confirm("📞 Incoming call...\nDo you want to receive?")) {
+                this.answerCall(); // 🟢 Answer the call
+              }
+            }
+          }
+        });
+
+
+      } else {
+        // Anonymous login if no user
+        try {
+          await signInAnonymously(auth);
+          console.log("✅ Signed in anonymously.");
+        } catch (error) {
+          console.error("❌ Anonymous Sign In Error:", error);
         }
       }
     });
-
   }
+
 };
 </script>
 <style>
