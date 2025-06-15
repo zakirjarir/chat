@@ -37,10 +37,11 @@ export default {
       pc: null,
       localStream: null,
       remoteStream: null,
-      callDocId: "video-call-room",
       remoteDescriptionSet: false,
       pendingCandidates: [],
       user: null,
+      callDocId: null,
+
     };
   },
   methods: {
@@ -53,47 +54,60 @@ export default {
     },
     async endCall() {
       try {
-        // Stop all tracks of local stream
+        // ✅ Stop local media tracks
         if (this.localStream) {
           this.localStream.getTracks().forEach(track => track.stop());
           this.localStream = null;
         }
 
-        // Close peer connection
+        // ✅ Close peer connection if exists
         if (this.pc) {
           this.pc.close();
           this.pc = null;
         }
 
-        // Remove video sources
+        // ✅ Clear video element sources
         if (this.$refs.remoteVideo) {
           this.$refs.remoteVideo.srcObject = null;
         }
+
         if (this.$refs.localVideo) {
           this.$refs.localVideo.srcObject = null;
         }
 
-        // Delete Firestore call document
-        const callDocRef = doc(db, "calls", this.callDocId); // this.callDocId = "video-call-room"
-        await deleteDoc(callDocRef);
+        // ✅ Delete the call document from Firestore
+        if (this.callDocId) {
+          const callDocRef = doc(db, "calls", this.callDocId);
+          await deleteDoc(callDocRef);
+          console.log("📂 Firestore call document deleted.");
+        } else {
+          console.warn("⚠️ No callDocId found. Skipping Firestore delete.");
+        }
 
+        // ✅ Navigate back
         this.$router.go(-1);
-        console.log("Call ended and document deleted.");
+        console.log("📞 Call ended successfully.");
+
       } catch (error) {
-        console.error("Error ending call:", error);
+        console.error("❌ Error ending call:", error);
       }
     },
+
+
+
+
     async startCall() {
-      // Sender (Caller) UID
+      // Step 1: Get caller and receiver UIDs
       const senderUid = this.user.uid;
       const receiverUid = this.$route.params.id;
 
-      // 🔑 Unique call doc ID
+      // Step 2: Generate unique Firestore call document ID (sorted)
       this.callDocId = [senderUid, receiverUid].sort().join("_");
 
+      // Step 3: Create new RTCPeerConnection instance
       this.pc = new RTCPeerConnection();
 
-      // Local Stream
+      // Step 4: Get local media stream (camera + mic)
       try {
         this.localStream = await navigator.mediaDevices.getUserMedia({
           video: true,
@@ -102,80 +116,98 @@ export default {
         this.$refs.localVideo.srcObject = this.localStream;
       } catch (error) {
         alert("Cannot access camera and microphone: " + error.message);
-        console.error(error);
+        console.error("Media Error:", error);
         return;
       }
 
+      // Step 5: Prepare remote stream for incoming tracks
       this.remoteStream = new MediaStream();
       this.$refs.remoteVideo.srcObject = this.remoteStream;
 
-      // Local Tracks
+      // Step 6: Add all local tracks to the peer connection
       this.localStream.getTracks().forEach((track) => {
         this.pc.addTrack(track, this.localStream);
       });
 
-      // Remote Tracks
+      // Step 7: When remote tracks arrive, add them to remoteStream
       this.pc.ontrack = (event) => {
         event.streams[0].getTracks().forEach((track) => {
           this.remoteStream.addTrack(track);
         });
       };
 
-      // Firestore references
+      // Step 8: Setup Firestore document references
       const callDocRef = doc(db, "calls", this.callDocId);
+
+      // Create or overwrite the call document with metadata (sender, receiver, timestamp)
+      await setDoc(callDocRef, {
+        sender: senderUid,
+        receiver: receiverUid,
+        createdAt: Date.now(),
+      });
+
       const offerCandidatesRef = collection(callDocRef, "offerCandidates");
       const answerCandidatesRef = collection(callDocRef, "answerCandidates");
 
-      // Send ICE candidates
+      // Step 9: On ICE candidate event, add candidate to Firestore
       this.pc.onicecandidate = async (event) => {
         if (event.candidate) {
-          await addDoc(offerCandidatesRef, event.candidate.toJSON());
+          try {
+            await addDoc(offerCandidatesRef, event.candidate.toJSON());
+          } catch (error) {
+            console.error("Error adding ICE candidate: ", error);
+          }
         }
       };
 
-      // Create and send offer
+      // Step 10: Create WebRTC offer and set as local description
       const offerDescription = await this.pc.createOffer();
       await this.pc.setLocalDescription(offerDescription);
 
+      // Step 11: Save offer SDP to Firestore
       const offer = {
         type: offerDescription.type,
         sdp: offerDescription.sdp,
-        sender: senderUid,
-        receiver: receiverUid,
-        timestamp: Date.now(),
       };
+      await setDoc(callDocRef, { offer }, { merge: true });
 
-      await setDoc(callDocRef, {offer});
-
-      // Listen for answer
+      // Step 12: Listen for answer SDP from remote peer, then set as remote description
       onSnapshot(callDocRef, (snapshot) => {
         const data = snapshot.data();
-        if (!this.pc.currentRemoteDescription && data?.answer) {
+        if (
+            data?.answer &&
+            !this.pc.currentRemoteDescription
+        ) {
           const answerDescription = new RTCSessionDescription(data.answer);
           this.pc.setRemoteDescription(answerDescription);
         }
       });
 
-      // Listen for ICE candidates from answer side
+      // Step 13: Listen for remote ICE candidates (from answerer) and add them
       onSnapshot(answerCandidatesRef, (snapshot) => {
         snapshot.docChanges().forEach(async (change) => {
           if (change.type === "added") {
             const candidate = new RTCIceCandidate(change.doc.data());
-            if (
-                this.pc.remoteDescription &&
-                this.pc.remoteDescription.type !== null
-            ) {
-              await this.pc.addIceCandidate(candidate);
-            } else {
-              const interval = setInterval(async () => {
-                if (
-                    this.pc.remoteDescription &&
-                    this.pc.remoteDescription.type !== null
-                ) {
-                  await this.pc.addIceCandidate(candidate);
-                  clearInterval(interval);
-                }
-              }, 100);
+            try {
+              if (
+                  this.pc.remoteDescription &&
+                  this.pc.remoteDescription.type !== null
+              ) {
+                await this.pc.addIceCandidate(candidate);
+              } else {
+                // If remoteDescription not set yet, keep retrying
+                const interval = setInterval(async () => {
+                  if (
+                      this.pc.remoteDescription &&
+                      this.pc.remoteDescription.type !== null
+                  ) {
+                    await this.pc.addIceCandidate(candidate);
+                    clearInterval(interval);
+                  }
+                }, 100);
+              }
+            } catch (error) {
+              console.error("Error adding remote ICE candidate:", error);
             }
           }
         });

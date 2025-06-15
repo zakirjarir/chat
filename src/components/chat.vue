@@ -2,9 +2,9 @@
   <div class="container-fluid p-0">
     <div class="bg-primary py-1 px-2 shadow-sm d-flex sticky-top justify-content-between align-items-center">
       <!-- Back Button -->
-      <div class="me-2" @click="$router.back()" title="Back">
+      <router-link class="me-2" to="/contact">
         <i class="bi bi-arrow-left fs-3"></i>
-      </div>
+      </router-link>
 
       <!-- User Name -->
       <h5 class="mb-0 text-white text-center fw-bold flex-grow-1">{{ this.toUser }}</h5>
@@ -184,7 +184,6 @@ export default {
   async mounted() {
     try {
       const user = await this.loginStatus();
-      this.currentUid = user.uid; // ✅ save current user ID
 
       await this.getUserData(this.toUid);
 
@@ -225,29 +224,6 @@ export default {
           }
         }
       });
-
-      // ✅ Call Document Ref এখন ইউজার আইডি পাওয়ার পরে
-      const callDocId = "video-call-room"; // অথবা dynamic করে this.callDocId
-      const callDocRef = doc(db, "calls", callDocId);
-
-      // ✅ Incoming call listener
-      onSnapshot(callDocRef, (docSnapshot) => {
-        if (docSnapshot.exists()) {
-          const data = docSnapshot.data();
-
-          if (data.offer && !this.remoteDescriptionSet && data.offer.receiver === this.currentUid) {
-            this.showNotification('📞 Incoming call from ' + data.offer.sender, {
-              body: "Do you want to answer the call?",
-              icon: "https://cdn-icons-png.flaticon.com/512/5978/5978995.png",
-            });
-
-            if (confirm("📞 Incoming call...\nDo you want to receive?")) {
-              this.answerCall(); // 🟢 Answer the call
-            }
-          }
-        }
-      });
-
     } catch (err) {
       console.error("Error during mount:", err);
     }
@@ -286,7 +262,6 @@ export default {
 .bi-arrow-left{
   cursor: pointer;
   color: white;
-  font-weight: bolder;
 }
 
 </style>
