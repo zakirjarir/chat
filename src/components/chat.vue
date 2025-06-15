@@ -21,7 +21,7 @@
         </div>
       </div>
     </div>
-    <div class="row g-0">
+    <div class="row g-0 mb-1">
       <!-- Chat Area -->
       <div class="col-12 col-md-9 d-flex flex-column">
         <!-- Chat Body -->
@@ -53,7 +53,7 @@
         </div>
       </div>
     </div>
-    <footer class="sticky-bottom border-top bg-dark">
+    <footer class="sticky-bottom border-top bg-dark mt-2">
       <div v-if="user" class="p-3">
         <div class="d-flex align-items-end">
 
@@ -231,7 +231,7 @@ export default {
               icon: "https://cdn-icons-png.flaticon.com/512/190/190411.png",
               badge: "https://cdn-icons-png.flaticon.com/512/190/190411.png",
               data: {
-                url: "http://localhost:8080/zchat/#/chat/" + this.toUid,
+                url: "https://zakir-git.github.io/zchat/#/chat/" + this.toUid,
               }
             });
           }
