@@ -193,7 +193,6 @@ export default {
 
   },
 
-
   async mounted() {
     try {
       const user = await this.loginStatus();
