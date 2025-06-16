@@ -1,8 +1,8 @@
 <template>
   <div>
     <div v-if="user" class="container">
-      <video ref="remoteVideo" autoplay playsinline muted class="remote-video"></video>
-      <video ref="localVideo" autoplay playsinline muted class="local-video"></video>
+      <video ref="remoteVideo" autoplay playsinline class="remote-video"></video>
+      <video ref="localVideo" autoplay playsinline class="local-video"></video>
 
       <div class="controls d-flex justify-content-center gap-3 mt-3">
         <button class="btn btn-danger d-flex align-items-center btn-sm gap-2" @click="endCall">
