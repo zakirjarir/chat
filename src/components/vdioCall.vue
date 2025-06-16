@@ -1,15 +1,28 @@
 <template>
   <div>
     <div v-if="user" class="container">
-      <video ref="remoteVideo" autoplay playsinline class="remote-video"></video>
-      <video ref="localVideo" autoplay playsinline class="local-video"></video>
+      <video ref="remoteVideo" style="transform: scaleX(-1);" autoplay playsinline class="remote-video"></video>
+      <video v-if="cameraOn" ref="localVideo" style="transform: scaleX(-1);" autoplay playsinline muted class="local-video"></video>
+      <div class="position-absolute top-0 start-0 m-3 px-3 py-1 bg-dark text-white rounded"
+          style="font-weight: bold; z-index: 9999;">
+        {{ formattedDuration }}
+      </div>
 
       <div class="controls d-flex justify-content-center gap-3 mt-3">
         <button class="btn btn-danger d-flex align-items-center btn-sm gap-2" @click="endCall">
           <i class="bi bi-telephone"></i> End
         </button>
+
+        <button class="btn btn-secondary d-flex align-items-center btn-sm gap-2" @click="toggleMic">
+          <i :class="micOn ? 'bi bi-mic-fill' : 'bi bi-mic-mute-fill'"></i>
+        </button>
+
+        <button class="btn btn-secondary d-flex align-items-center btn-sm gap-2" @click="toggleCamera">
+          <i :class="cameraOn ? 'bi bi-camera-video-fill' : 'bi bi-camera-video-off-fill'"></i>
+        </button>
       </div>
     </div>
+
     <router-link v-else to="/" class="btn btn-outline-light">
       Login Anonymously
     </router-link>
@@ -20,30 +33,35 @@
 import {
   doc,
   setDoc,
-  getDoc,
   collection,
   addDoc,
   onSnapshot,
-  deleteDoc, serverTimestamp
+  deleteDoc, serverTimestamp,
 } from "firebase/firestore";
 import { db } from "@/firebass/configration";
-import { getAuth, onAuthStateChanged, signInAnonymously as fbSignInAnonymously } from "firebase/auth";
+import {
+  getAuth,
+  onAuthStateChanged,
+  signInAnonymously as fbSignInAnonymously,
+} from "firebase/auth";
 
 export default {
   data() {
     return {
+      timer: null,
+      callDuration: 0, // in seconds
+      formattedDuration: "00:00",
+      micOn: true,
+      cameraOn: true,
       localStream: null,
       remoteStream: null,
       peerConnection: null,
       user: null,
-      callDocId: this.$route.params.id ,
+      callDocId: this.$route.params.id,
       pendingCandidates: [],
-
       servers: {
-        iceServers: [{ urls: ["stun:stun.l.google.com:19302"] }]
+        iceServers: [{ urls: ["stun:stun.l.google.com:19302"] }],
       },
-
-
     };
   },
   methods: {
@@ -51,39 +69,46 @@ export default {
       try {
         const auth = getAuth();
         await fbSignInAnonymously(auth);
-        // User state change listener will handle next steps
       } catch (error) {
         console.error("Anonymous login error:", error);
       }
     },
 
-    async endCall() {
-      try {
-        if (this.localStream) {
-          this.localStream.getTracks().forEach((track) => track.stop());
-          this.localStream = null;
-        }
+    startTimer() {
+      this.callDuration = 0;
+      this.updateFormattedDuration();
+      this.timer = setInterval(() => {
+        this.callDuration++;
+        this.updateFormattedDuration();
+      }, 1000);
+    },
 
-        if (this.peerConnection) {
-          this.peerConnection.close();
-          this.peerConnection = null;
-        }
+    stopTimer() {
+      clearInterval(this.timer);
+      this.timer = null;
+    },
 
-        if (this.$refs.remoteVideo) this.$refs.remoteVideo.srcObject = null;
-        if (this.$refs.localVideo) this.$refs.localVideo.srcObject = null;
+    updateFormattedDuration() {
+      const minutes = String(Math.floor(this.callDuration / 60)).padStart(2, "0");
+      const seconds = String(this.callDuration % 60).padStart(2, "0");
+      this.formattedDuration = `${minutes}:${seconds}`;
+    },
 
-        if (this.callDocId) {
-          const callDocRef = doc(db, "calls", this.callDocId);
-          await deleteDoc(callDocRef);
-          console.log("📂 Firestore call document deleted.");
-        } else {
-          console.warn("⚠️ No callDocId found. Skipping Firestore delete.");
-        }
+    toggleMic() {
+      this.micOn = !this.micOn;
+      if (this.localStream) {
+        this.localStream.getAudioTracks().forEach((track) => {
+          track.enabled = this.micOn;
+        });
+      }
+    },
 
-        this.$router.go(-1);
-        console.log("📞 Call ended successfully.");
-      } catch (error) {
-        console.error("❌ Error ending call:", error);
+    toggleCamera() {
+      this.cameraOn = !this.cameraOn;
+      if (this.localStream) {
+        this.localStream.getVideoTracks().forEach((track) => {
+          track.enabled = this.cameraOn;
+        });
       }
     },
 
@@ -145,6 +170,7 @@ export default {
               .then(async () => {
                 for (const candidate of this.pendingCandidates) {
                   await this.peerConnection.addIceCandidate(candidate);
+                  this.startTimer()
                 }
                 this.pendingCandidates = [];
               })
@@ -173,91 +199,33 @@ export default {
         });
       });
     },
-
-    async joinCall() {
-      const callDoc = doc(db, "calls", this.callDocId);
-
-      const callData = (await getDoc(callDoc)).data();
-      if (!callData) {
-        console.error("Call document does not exist!");
-        return;
-      }
-
-      const offerCandidates = collection(callDoc, "offerCandidates");
-      const answerCandidates = collection(callDoc, "answerCandidates");
-
-      this.localStream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true
-      });
-      this.remoteStream = new MediaStream();
-
-      this.$refs.localVideo.srcObject = this.localStream;
-      this.$refs.remoteVideo.srcObject = this.remoteStream;
-
-      this.peerConnection = new RTCPeerConnection(this.servers);
-
-      this.localStream.getTracks().forEach((track) => {
-        this.peerConnection.addTrack(track, this.localStream);
-      });
-
-      this.peerConnection.ontrack = (event) => {
-        event.streams[0].getTracks().forEach((track) => {
-          this.remoteStream.addTrack(track);
-        });
-      };
-
-      this.peerConnection.onicecandidate = async (event) => {
-        if (event.candidate) {
-          await addDoc(answerCandidates, event.candidate.toJSON());
+    async endCall() {
+      try {
+        if (this.localStream) {
+          this.localStream.getTracks().forEach((track) => track.stop());
+          this.localStream = null;
         }
-      };
 
-      await this.peerConnection
-          .setRemoteDescription(new RTCSessionDescription(callData.offer))
-          .then(async () => {
-            const answerDescription = await this.peerConnection.createAnswer();
-            await this.peerConnection.setLocalDescription(answerDescription);
+        if (this.peerConnection) {
+          this.peerConnection.close();
+          this.peerConnection = null;
+        }
 
-            await setDoc(
-                callDoc,
-                {
-                  answer: {
-                    type: answerDescription.type,
-                    sdp: answerDescription.sdp
-                  }
-                },
-                { merge: true }
-            );
+        if (this.$refs.remoteVideo) this.$refs.remoteVideo.srcObject = null;
+        if (this.$refs.localVideo) this.$refs.localVideo.srcObject = null;
 
-            for (const candidate of this.pendingCandidates) {
-              await this.peerConnection.addIceCandidate(candidate);
-            }
-            this.pendingCandidates = [];
-          })
-          .catch((e) => {
-            console.error("Error setting remote description:", e);
-          });
+        if (this.callDocId) {
+          const callDocRef = doc(db, "calls", this.callDocId);
+          await deleteDoc(callDocRef);
+          console.log("📂 Firestore call document deleted.");
+        }
+        this.stopTimer();
 
-      // Listen for offer ICE candidates safely
-      onSnapshot(offerCandidates, (snapshot) => {
-        snapshot.docChanges().forEach((change) => {
-          if (change.type === "added") {
-            const candidate = new RTCIceCandidate(change.doc.data());
-            if (
-                this.peerConnection &&
-                this.peerConnection.currentRemoteDescription
-            ) {
-              this.peerConnection.addIceCandidate(candidate).catch((e) => {
-                console.error("Error adding ICE candidate:", e);
-              });
-            } else {
-              this.pendingCandidates.push(candidate);
-            }
-          }
-        });
-      });
-    }
+        this.$router.go(-1);
+      } catch (error) {
+        console.error("❌ Error ending call:", error);
+      }
+    },
   },
 
   mounted() {
@@ -266,10 +234,7 @@ export default {
     onAuthStateChanged(auth, async (user) => {
       if (user) {
         this.user = user;
-        // তোমার ইচ্ছামতো কল শুরু করো বা জয়েন করো:
         await this.startCall();
-        // অথবা
-        // await this.joinCall();
       } else {
         try {
           await this.signInAnonymously();
