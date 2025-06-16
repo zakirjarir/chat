@@ -3,6 +3,7 @@ import chat from "@/components/chat.vue";
 import login from "@/components/login.vue";
 import VdioCall from "@/components/vdioCall.vue";
 import contact from "@/components/contact.vue";
+import VideoCallAns from "@/components/videoCallAns.vue";
 
 const routes = [
     {
@@ -24,6 +25,11 @@ const routes = [
         path:'/vdiocall/:id',
         name: 'vdiocall',
         component: VdioCall
+    },
+    {
+        path:'/vdiocallans/:id',
+        name: 'vdiocallans',
+        component: VideoCallAns
     },
     {
         path: '/contact',

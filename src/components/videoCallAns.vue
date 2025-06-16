@@ -27,7 +27,7 @@ import {
   collection,
   addDoc,
   onSnapshot,
-  deleteDoc, serverTimestamp
+  deleteDoc,
 } from "firebase/firestore";
 import { db } from "@/firebass/configration";
 import { getAuth, onAuthStateChanged, signInAnonymously as fbSignInAnonymously } from "firebase/auth";
@@ -88,93 +88,6 @@ export default {
       } catch (error) {
         console.error("❌ Error ending call:", error);
       }
-    },
-
-    async startCall() {
-      console.log(this.user.uid)
-      const callDoc = doc(db, "calls", this.callDocId);
-
-      const offerCandidates = collection(callDoc, "offerCandidates");
-      const answerCandidates = collection(callDoc, "answerCandidates");
-
-      this.localStream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true
-      });
-      this.remoteStream = new MediaStream();
-
-      this.$refs.localVideo.srcObject = this.localStream;
-      this.$refs.remoteVideo.srcObject = this.remoteStream;
-
-      this.peerConnection = new RTCPeerConnection(this.servers);
-
-      this.localStream.getTracks().forEach((track) => {
-        this.peerConnection.addTrack(track, this.localStream);
-      });
-
-      this.peerConnection.ontrack = (event) => {
-        event.streams[0].getTracks().forEach((track) => {
-          this.remoteStream.addTrack(track);
-        });
-      };
-
-      this.peerConnection.onicecandidate = async (event) => {
-        if (event.candidate) {
-          await addDoc(offerCandidates, event.candidate.toJSON());
-        }
-      };
-
-      const offerDescription = await this.peerConnection.createOffer();
-      await this.peerConnection.setLocalDescription(offerDescription);
-      await setDoc(callDoc, {
-        offer: {
-          type: offerDescription.type,
-          sdp: offerDescription.sdp,
-          createdAt: serverTimestamp(),
-        }
-      });
-
-      // Watch for answer with safe arrow function & null check
-      onSnapshot(callDoc, (snapshot) => {
-        const data = snapshot.data();
-        if (
-            data?.answer &&
-            this.peerConnection &&
-            !this.peerConnection.currentRemoteDescription
-        ) {
-          const answerDescription = new RTCSessionDescription(data.answer);
-          this.peerConnection
-              .setRemoteDescription(answerDescription)
-              .then(async () => {
-                for (const candidate of this.pendingCandidates) {
-                  await this.peerConnection.addIceCandidate(candidate);
-                }
-                this.pendingCandidates = [];
-              })
-              .catch((e) => {
-                console.error("Error setting remote description:", e);
-              });
-        }
-      });
-
-      // Listen for remote ICE candidates safely
-      onSnapshot(answerCandidates, (snapshot) => {
-        snapshot.docChanges().forEach((change) => {
-          if (change.type === "added") {
-            const candidate = new RTCIceCandidate(change.doc.data());
-            if (
-                this.peerConnection &&
-                this.peerConnection.currentRemoteDescription
-            ) {
-              this.peerConnection.addIceCandidate(candidate).catch((e) => {
-                console.error("Error adding ICE candidate:", e);
-              });
-            } else {
-              this.pendingCandidates.push(candidate);
-            }
-          }
-        });
-      });
     },
 
     async joinCall() {
@@ -269,10 +182,7 @@ export default {
     onAuthStateChanged(auth, async (user) => {
       if (user) {
         this.user = user;
-        // তোমার ইচ্ছামতো কল শুরু করো বা জয়েন করো:
-        await this.startCall();
-        // অথবা
-        // await this.joinCall();
+        await this.joinCall();
       } else {
         try {
           await this.signInAnonymously();
