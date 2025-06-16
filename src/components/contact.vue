@@ -46,9 +46,9 @@
         </div>
       </div>
       <div v-else class="text-center my-auto">
-        <button @click="signInAnonymously" class="btn btn-outline-light">
+        <router-link to="/" class="btn btn-outline-light">
           Login Anonymously
-        </button>
+        </router-link>
       </div>
     </div>
   </div>
