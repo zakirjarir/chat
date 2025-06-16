@@ -8,9 +8,6 @@
         <button class="btn btn-danger d-flex align-items-center btn-sm gap-2" @click="endCall">
           <i class="bi bi-telephone"></i> End
         </button>
-        <button class="btn btn-danger d-flex align-items-center btn-sm gap-2" @click="joinCall">
-          <i class="bi bi-telephone"></i> Join
-        </button>
       </div>
     </div>
     <router-link v-else to="/" class="btn btn-outline-light">
