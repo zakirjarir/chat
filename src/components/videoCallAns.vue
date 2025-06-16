@@ -3,12 +3,13 @@
     <div v-if="user" class="container">
       <video ref="remoteVideo" style="transform: scaleX(-1);" autoplay playsinline class="remote-video"></video>
       <video ref="localVideo" v-if="cameraOn" style="transform: scaleX(-1);" autoplay playsinline muted class="local-video"></video>
-      <div
-          class="position-absolute top-0 start-0 m-3 px-3 py-1 bg-dark text-white rounded"
-          style="font-weight: bold; z-index: 9999;">
+
+      <!-- Timer -->
+      <div class="position-absolute top-0 start-0 m-3 px-3 py-1 bg-dark text-white rounded" style="font-weight: bold; z-index: 9999;">
         {{ formattedDuration }}
       </div>
 
+      <!-- Controls -->
       <div class="controls d-flex justify-content-center gap-3 mt-3">
         <button class="btn btn-danger d-flex align-items-center btn-sm gap-2" @click="endCall">
           <i class="bi bi-telephone"></i> End
@@ -32,33 +33,25 @@
 
 <script>
 import {
-  doc,
-  setDoc,
-  getDoc,
-  collection,
-  addDoc,
-  onSnapshot,
-  deleteDoc,
+  doc, setDoc, getDoc, collection, addDoc, onSnapshot, deleteDoc,
 } from "firebase/firestore";
 import { db } from "@/firebass/configration";
 import {
-  getAuth,
-  onAuthStateChanged,
-  signInAnonymously as fbSignInAnonymously,
+  getAuth, onAuthStateChanged, signInAnonymously as fbSignInAnonymously,
 } from "firebase/auth";
 
 export default {
   data() {
     return {
+      user: null,
       timer: null,
-      callDuration: 0, // in seconds
+      callDuration: 0,
       formattedDuration: "00:00",
       micOn: true,
       cameraOn: true,
       localStream: null,
       remoteStream: null,
       peerConnection: null,
-      user: null,
       callDocId: this.$route.params.id,
       pendingCandidates: [],
       servers: {
@@ -66,6 +59,7 @@ export default {
       },
     };
   },
+
   methods: {
     async signInAnonymously() {
       try {
@@ -75,7 +69,6 @@ export default {
         console.error("Anonymous login error:", error);
       }
     },
-
 
     startTimer() {
       this.callDuration = 0;
@@ -133,13 +126,12 @@ export default {
         if (this.callDocId) {
           const callDocRef = doc(db, "calls", this.callDocId);
           await deleteDoc(callDocRef);
-          console.log("📂 Firestore call document deleted.");
         }
-        this.stopTimer();
 
+        this.stopTimer();
         this.$router.go(-1);
       } catch (error) {
-        console.error("❌ Error ending call:", error);
+        console.error("Error ending call:", error);
       }
     },
 
@@ -156,9 +148,19 @@ export default {
       const answerCandidates = collection(callDoc, "answerCandidates");
 
       this.localStream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true,
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30 },
+          facingMode: "user"
+        },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          sampleRate: 44100
+        }
       });
+
 
       this.remoteStream = new MediaStream();
       this.$refs.localVideo.srcObject = this.localStream;
@@ -168,6 +170,15 @@ export default {
 
       this.localStream.getTracks().forEach((track) => {
         this.peerConnection.addTrack(track, this.localStream);
+      });
+
+      this.peerConnection.getSenders().forEach(sender => {
+        if (sender.track.kind === "video") {
+          const parameters = sender.getParameters();
+          if (!parameters.encodings) parameters.encodings = [{}];
+          parameters.encodings[0].maxBitrate = 1500 * 1000; // 1.5 Mbps
+          sender.setParameters(parameters);
+        }
       });
 
       this.peerConnection.ontrack = (event) => {
@@ -183,9 +194,7 @@ export default {
       };
 
       try {
-        await this.peerConnection.setRemoteDescription(
-            new RTCSessionDescription(callData.offer)
-        );
+        await this.peerConnection.setRemoteDescription(new RTCSessionDescription(callData.offer));
         const answerDescription = await this.peerConnection.createAnswer();
         await this.peerConnection.setLocalDescription(answerDescription);
         this.startTimer();
@@ -213,10 +222,7 @@ export default {
         snapshot.docChanges().forEach((change) => {
           if (change.type === "added") {
             const candidate = new RTCIceCandidate(change.doc.data());
-            if (
-                this.peerConnection &&
-                this.peerConnection.currentRemoteDescription
-            ) {
+            if (this.peerConnection && this.peerConnection.currentRemoteDescription) {
               this.peerConnection.addIceCandidate(candidate).catch((e) => {
                 console.error("Error adding ICE candidate:", e);
               });
@@ -231,7 +237,6 @@ export default {
 
   mounted() {
     const auth = getAuth();
-
     onAuthStateChanged(auth, async (user) => {
       if (user) {
         this.user = user;
@@ -289,4 +294,10 @@ export default {
   color: white;
   transition: background-color 0.3s;
 }
+
+video {
+  image-rendering: auto;
+  filter: contrast(1.05) brightness(1.1);
+}
+
 </style>

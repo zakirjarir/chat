@@ -37,10 +37,8 @@
             <div class="flex-grow-1">
               <div class="d-flex justify-content-between align-items-center">
                 <h6 class="mb-0 fw-semibold text-white">{{ contact.name }}</h6>
-                <!--              <small class="time-text">{{ formatDate(contact.createdAt) }}</small>-->
               </div>
-              <!--            <div class="text-white ">{{ contact.email }}</div>-->
-              <div class="text-white">You :Hi</div>
+                  <div class="text-white ">{{ contact.email }}</div>
             </div>
           </div>
         </div>

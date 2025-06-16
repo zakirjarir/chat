@@ -113,25 +113,46 @@ export default {
     },
 
     async startCall() {
-      console.log(this.user.uid)
+      console.log(this.user.uid);
       const callDoc = doc(db, "calls", this.callDocId);
 
       const offerCandidates = collection(callDoc, "offerCandidates");
       const answerCandidates = collection(callDoc, "answerCandidates");
 
+      // Get user media with quality and audio constraints
       this.localStream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30 },
+          facingMode: "user"
+        },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          sampleRate: 44100
+        }
       });
-      this.remoteStream = new MediaStream();
 
+      this.remoteStream = new MediaStream();
       this.$refs.localVideo.srcObject = this.localStream;
       this.$refs.remoteVideo.srcObject = this.remoteStream;
 
       this.peerConnection = new RTCPeerConnection(this.servers);
 
+      // Add local tracks to peer connection
       this.localStream.getTracks().forEach((track) => {
         this.peerConnection.addTrack(track, this.localStream);
+      });
+
+      // Optional: Set bitrate limit for video (1.5 Mbps)
+      this.peerConnection.getSenders().forEach((sender) => {
+        if (sender.track.kind === "video") {
+          const parameters = sender.getParameters();
+          if (!parameters.encodings) parameters.encodings = [{}];
+          parameters.encodings[0].maxBitrate = 1500 * 1000; // 1.5 Mbps
+          sender.setParameters(parameters);
+        }
       });
 
       this.peerConnection.ontrack = (event) => {
@@ -146,6 +167,7 @@ export default {
         }
       };
 
+      // Create and send offer
       const offerDescription = await this.peerConnection.createOffer();
       await this.peerConnection.setLocalDescription(offerDescription);
       await setDoc(callDoc, {
@@ -156,7 +178,7 @@ export default {
         }
       });
 
-      // Watch for answer with safe arrow function & null check
+      // Listen for answer
       onSnapshot(callDoc, (snapshot) => {
         const data = snapshot.data();
         if (
@@ -170,9 +192,9 @@ export default {
               .then(async () => {
                 for (const candidate of this.pendingCandidates) {
                   await this.peerConnection.addIceCandidate(candidate);
-                  this.startTimer()
                 }
                 this.pendingCandidates = [];
+                this.startTimer();
               })
               .catch((e) => {
                 console.error("Error setting remote description:", e);
@@ -180,7 +202,7 @@ export default {
         }
       });
 
-      // Listen for remote ICE candidates safely
+      // Listen for answer candidates
       onSnapshot(answerCandidates, (snapshot) => {
         snapshot.docChanges().forEach((change) => {
           if (change.type === "added") {
@@ -292,4 +314,9 @@ export default {
   color: white;
   transition: background-color 0.3s;
 }
+video {
+  image-rendering: auto;
+  filter: contrast(1.05) brightness(1.1);
+}
+
 </style>
